@@ -63,12 +63,9 @@ async def ban(ctx, user: disnake.Member, reason: str):
 	ping = user.mention
 
 	if ctx.author.top_role.position > user.top_role.position:
-		if ctx.author.has_permissions.ban_members:
-			await user.ban(reason=reason)
-			await ctx.send(f"{ping} был забанен по причине {reason}.")
-		else:
-			await ctx.send("У тебя нету прав ІДІ нахуй.")
+		await user.ban(reason=reason)
+		await ctx.send(f"{ping} был забанен по причине {reason}.")
 	else:
 		await ctx.send("Ты хотел забанить админа? ІДІ нахуй.")
-
+		
 bot.run("YOU_TOKEN")
