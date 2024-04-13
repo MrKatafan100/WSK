@@ -71,4 +71,4 @@ async def ban(ctx, user: disnake.Member, reason: str):
 	else:
 		await ctx.send("Ты хотел забанить админа? ІДІ нахуй.")
 
-bot.run("MTIyODMyOTYzNjUzNTIwNTk1MA.G6PPU8.MTfrFlqTtUy2K4U2jLS7nd5-mpB54-k4dGUp58")
+bot.run("YOU_TOKEN")
