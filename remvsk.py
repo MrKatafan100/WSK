@@ -6,12 +6,19 @@ from disnake.ext import commands
 from disnake.ext.commands import has_permissions
 from disnake import Embed
 
-db = sqlite3.connect("huina.db")
+db = sqlite3.connect("D:/newvsk/huina.db")
 cursor = db.cursor()
 """
 cursor.execute('''CREATE TABLE local (
 	server integer,
 	language boolean
+)''')
+
+cursor.execute('''CREATE TABLE roles (
+	server integer,
+	role1 integer,
+	role2 integer,
+	role3 integer
 )''')
 """
 bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intents.all())
@@ -20,6 +27,50 @@ bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intent
 async def on_ready():
 	print(f"{bot.user} готов сжигать евреев.")
 	await bot.change_presence(activity=disnake.Game(name="HOI4"))
+
+@has_permissions(administrator=True)
+@bot.slash_command(
+	name="set_roles_add_on_join",
+	description="закрепляет роль",
+	options=[
+		disnake.Option("role1", "role", type=disnake.OptionType.role, required=True),
+		disnake.Option("role2", "role", type=disnake.OptionType.role, required=False),
+		disnake.Option("role3", "role", type=disnake.OptionType.role, required=False)
+	]
+)
+
+async def get_roles(ctx, role1: disnake.Role, role2: disnake.Role = None, role3: disnake.Role = None):
+	server_id = ctx.guild.id
+
+	role_id1 = role1.id
+
+	if role2 is None:
+		role_id2 = None
+	else:
+		role_id2 = role2.id
+
+	if role3 is None:
+		role_id3 = None
+	else:
+		role_id3 = role3.id
+
+	cursor.execute("SELECT * FROM roles WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	language = await vibor_yazika(ctx)
+
+	if result:
+		cursor.execute("UPDATE roles SET role1 = ?, role2 = ?, role3 = ? WHERE server = ?", (role_id1, role_id2, role_id3, server_id))
+		if language == False:
+			await ctx.send("Роли успешно выбраны!")
+		else:
+			await ctx.send("Roles have been successfully selected!")			
+	else:
+		cursor.execute("INSERT INTO roles VALUES (?, ?, ?, ?)", (server_id, role_id1, role_id2, role_id3))
+		if language == False:
+			await ctx.send("Роли успешно выбраны!")
+		else:
+			await ctx.send("Roles have been successfully selected!")
 
 @bot.event
 async def on_member_join(member):
@@ -36,7 +87,7 @@ async def on_member_join(member):
 	if result:
 		language = result[1]
 	else:
-		await print("Не выбран язык")
+		await chanel.send("Не выбран язык")
 
 	embedr = Embed(
 		title="Этого мобилизируем↓↓↓",
@@ -232,7 +283,7 @@ async def obnova(ctx):
 	if result:
 		language = result[1]
 	else:
-		language = None
+		language = None	
 
 	if language is None:
 		cursor.execute("INSERT INTO local VALUES(?, False)", (server_id,))
@@ -261,6 +312,19 @@ async def test(ctx):
 		await ctx.send("язык бота Русский")
 	else:
 		await ctx.send("bot language English")
+
+async def vibor_yazika(ctx):
+	server_id = ctx.guild.id
+
+	cursor.execute("SELECT * FROM local WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		language = result[1]
+	else:
+		language = None
+
+	return language
 		
 bot.run("YOU_TOKEN")
 db.commit()
