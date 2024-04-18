@@ -8,7 +8,7 @@ from disnake import Embed
 
 db = sqlite3.connect("D:/newvsk/huina.db")
 cursor = db.cursor()
-"""
+
 cursor.execute('''CREATE TABLE local (
 	server integer,
 	language boolean
@@ -16,11 +16,17 @@ cursor.execute('''CREATE TABLE local (
 
 cursor.execute('''CREATE TABLE roles (
 	server integer,
-	role1 integer,
-	role2 integer,
+	role1 integer
+	role2 integer
 	role3 integer
 )''')
-"""
+
+cursor.execute('''CREATE TABLE text_message (
+	server integer,
+	title text,
+	text_mess text
+)''')
+
 bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intents.all())
 
 @bot.event
@@ -33,26 +39,14 @@ async def on_ready():
 	name="set_roles_add_on_join",
 	description="закрепляет роль",
 	options=[
-		disnake.Option("role1", "role", type=disnake.OptionType.role, required=True),
-		disnake.Option("role2", "role", type=disnake.OptionType.role, required=False),
-		disnake.Option("role3", "role", type=disnake.OptionType.role, required=False)
+		disnake.Option("role1", "role", type=disnake.OptionType.role, required=True)
 	]
 )
 
 async def get_roles(ctx, role1: disnake.Role, role2: disnake.Role = None, role3: disnake.Role = None):
 	server_id = ctx.guild.id
 
-	role_id1 = role1.id
-
-	if role2 is None:
-		role_id2 = None
-	else:
-		role_id2 = role2.id
-
-	if role3 is None:
-		role_id3 = None
-	else:
-		role_id3 = role3.id
+	role_id1 = role1.id		 
 
 	cursor.execute("SELECT * FROM roles WHERE server = ?", (server_id,))
 	result = cursor.fetchone()
@@ -60,25 +54,52 @@ async def get_roles(ctx, role1: disnake.Role, role2: disnake.Role = None, role3:
 	language = await vibor_yazika(ctx)
 
 	if result:
-		cursor.execute("UPDATE roles SET role1 = ?, role2 = ?, role3 = ? WHERE server = ?", (role_id1, role_id2, role_id3, server_id))
+		cursor.execute("UPDATE roles SET role1 = ? WHERE server = ?", (role_id1, server_id))
 		if language == False:
 			await ctx.send("Роли успешно выбраны!")
 		else:
 			await ctx.send("Roles have been successfully selected!")			
 	else:
-		cursor.execute("INSERT INTO roles VALUES (?, ?, ?, ?)", (server_id, role_id1, role_id2, role_id3))
+		cursor.execute("INSERT INTO roles VALUES (?, ?)", (server_id, role_id1))
 		if language == False:
 			await ctx.send("Роли успешно выбраны!")
 		else:
 			await ctx.send("Roles have been successfully selected!")
 
+@has_permissions(administrator=True)
+@bot.slash_command(
+	name="set_message_add_on_join",
+	description="Сообщение которое будет отправлятся когда кто то заходит.",
+	options=[
+		disnake.Option("title", "title", type=disnake.OptionType.string, required=True),
+		disnake.Option("text", "text", type=disnake.OptionType.string, required=True)
+	]
+)
+
+async def get_message(ctx, title: str, text: str):
+	server_id = ctx.guild.id
+	language = await vibor_yazika(ctx)
+
+	cursor.execute("SELECT * FROM text_message WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if language == False:
+		if result:
+			cursor.execute("UPDATE text_message SET title = ?, text_mess = ? WHERE server = ?", (title, text, server_id))
+			await ctx.send("Текст добавлен.")
+		else:
+			cursor.execute("INSERT INTO text_message VALUES (?, ?, ?)", (server_id, title, text))	
+			await ctx.send("Текст добавлен.")
+	else:
+		if result:
+			cursor.execute("UPDATE text_message SET title = ?, text_mess = ? WHERE server = ?", (title, text, server_id))
+			await ctx.send("Text added.")
+		else:
+			cursor.execute("INSERT INTO text_message VALUES (?, ?, ?)", (server_id, title, text))	
+			await ctx.send("Text added.")		
+
 @bot.event
-async def on_member_join(member):
-	ping = member.mention
-	guild = member.guild
-	role = disnake.utils.get(guild.roles, name="Гражданский")
-	role2 = disnake.utils.get(guild.roles, name="Налог")
-	chanel = disnake.utils.get(guild.channels, name="👨👩гражданины")
+async def vibor_yazika_member(member):
 	server_id = member.guild.id
 
 	cursor.execute("SELECT * FROM local WHERE server = ?", (server_id,))
@@ -87,11 +108,61 @@ async def on_member_join(member):
 	if result:
 		language = result[1]
 	else:
-		await chanel.send("Не выбран язык")
+		language = None
+
+	return language	
+
+@bot.event
+async def role_hz(member):
+	server_id = member.guild.id
+
+	cursor.execute("SELECT * FROM roles WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:	
+		role_id1 = result[1]
+	else:
+		role_id1 = None
+
+	return role_id1
+
+async def text_return(member):
+	server_id = member.guild.id
+
+	cursor.execute("SELECT * FROM text_message WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		title = result[1]
+		text_mess = result[2]
+	else:
+		title = None
+		text_mess = None		
+
+	return title, text_mess
+
+#title = text_return()
+#print(f"{title}")	
+
+@bot.event
+async def on_member_join(member):
+	ping = member.mention
+	guild = member.guild
+	chanel = disnake.utils.get(guild.channels, name="👨👩гражданины")
+	result = await text_return(member)
+
+	role_id1 = await role_hz(member)
+	role1 = disnake.utils.get(guild.roles, id=role_id1)
+	title = result[0]
+	text_mess = result[1]
+
+	if title is None or text_mess is None:
+		print("Не выбран текст")
+		return
 
 	embedr = Embed(
-		title="Этого мобилизируем↓↓↓",
-		description=f"Новый Участник! {ping} тобі пізда.",
+		title=title,
+		description=f"{text_mess} {ping}.",
 		colour = 000000
 	)
 	
@@ -100,28 +171,11 @@ async def on_member_join(member):
 		url = "https://github.com/MrKatafan100",
 		icon_url = "https://cdn.discordapp.com/attachments/1207240200758108181/1228634187385278525/PCpXdqvUWfCW1mXhH1Y_98yBpgsWxuTSTofy3NGMo9yBTATDyzVkqU580bfSln50bFU.png?ex=662cc1c1&is=661a4cc1&hm=855c4eb3755fa480f4dd2dac41d40d77d632b421cdd83a884d9f1eab185c1987&"
 	)
-
-	embeda = Embed(
-		title="Mobilizing this one↓↓↓",
-		description=f"New Member! {ping}, you're screwed.",
-		colour = 000000
-	)
-	
-	embeda.set_author(
-		name = "by: v_stoilo",
-		url = "https://github.com/MrKatafan100",
-		icon_url = "https://cdn.discordapp.com/attachments/1207240200758108181/1228634187385278525/PCpXdqvUWfCW1mXhH1Y_98yBpgsWxuTSTofy3NGMo9yBTATDyzVkqU580bfSln50bFU.png?ex=662cc1c1&is=661a4cc1&hm=855c4eb3755fa480f4dd2dac41d40d77d632b421cdd83a884d9f1eab185c1987&"
-	)
 	
 	embedr.set_thumbnail(url="https://cdn.discordapp.com/attachments/1211575984483078206/1228591262450585631/3.png?ex=662c99c7&is=661a24c7&hm=d4b9580d8a9637fb3e46b6567398d75a57d8eeff14c43e2f51671841c4d10e33&")
-	embeda.set_thumbnail(url="https://cdn.discordapp.com/attachments/1211575984483078206/1228591262450585631/3.png?ex=662c99c7&is=661a24c7&hm=d4b9580d8a9637fb3e46b6567398d75a57d8eeff14c43e2f51671841c4d10e33&")
-	
-	if language == False:
-		await member.add_roles(role, role2)
-		await chanel.send(embed=embedr)
-	else:
-		await member.add_roles(role, role2)
-		await chanel.send(embed=embeda)		
+
+	await member.add_roles(role1)
+	await chanel.send(embed=embedr)
 
 @has_permissions(ban_members=True)
 @bot.slash_command(
@@ -324,7 +378,7 @@ async def vibor_yazika(ctx):
 	else:
 		language = None
 
-	return language
+	return language	
 		
 bot.run("YOU_TOKEN")
 db.commit()
