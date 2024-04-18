@@ -139,10 +139,7 @@ async def text_return(member):
 		title = None
 		text_mess = None		
 
-	return title, text_mess
-
-#title = text_return()
-#print(f"{title}")	
+	return title, text_mess	
 
 @bot.event
 async def on_member_join(member):
