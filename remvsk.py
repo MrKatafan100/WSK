@@ -8,7 +8,7 @@ from disnake import Embed
 
 db = sqlite3.connect("D:/newvsk/huina.db")
 cursor = db.cursor()
-
+"""
 cursor.execute('''CREATE TABLE local (
 	server integer,
 	language boolean
@@ -16,8 +16,8 @@ cursor.execute('''CREATE TABLE local (
 
 cursor.execute('''CREATE TABLE roles (
 	server integer,
-	role1 integer
-	role2 integer
+	role1 integer,
+	role2 integer,
 	role3 integer
 )''')
 
@@ -26,7 +26,7 @@ cursor.execute('''CREATE TABLE text_message (
 	title text,
 	text_mess text
 )''')
-
+"""
 bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intents.all())
 
 @bot.event
@@ -39,14 +39,26 @@ async def on_ready():
 	name="set_roles_add_on_join",
 	description="закрепляет роль",
 	options=[
-		disnake.Option("role1", "role", type=disnake.OptionType.role, required=True)
+		disnake.Option("role1", "role", type=disnake.OptionType.role, required=True),
+		disnake.Option("role2", "role", type=disnake.OptionType.role, required=False),
+		disnake.Option("role3", "role", type=disnake.OptionType.role, required=False)
 	]
 )
 
 async def get_roles(ctx, role1: disnake.Role, role2: disnake.Role = None, role3: disnake.Role = None):
 	server_id = ctx.guild.id
 
-	role_id1 = role1.id		 
+	role_id1 = role1.id	
+
+	if role2 is None:
+		role_id2 = None
+	else:
+		role_id2 = role2.id
+
+	if role3 is None:
+		role_id3 = None
+	else:
+		role_id3 = role3.id 		 
 
 	cursor.execute("SELECT * FROM roles WHERE server = ?", (server_id,))
 	result = cursor.fetchone()
@@ -54,13 +66,13 @@ async def get_roles(ctx, role1: disnake.Role, role2: disnake.Role = None, role3:
 	language = await vibor_yazika(ctx)
 
 	if result:
-		cursor.execute("UPDATE roles SET role1 = ? WHERE server = ?", (role_id1, server_id))
+		cursor.execute("UPDATE roles SET role1 = ?, role2 = ?, role3 = ?  WHERE server = ?", (role_id1, role_id2, role_id3, server_id))
 		if language == False:
 			await ctx.send("Роли успешно выбраны!")
 		else:
 			await ctx.send("Roles have been successfully selected!")			
 	else:
-		cursor.execute("INSERT INTO roles VALUES (?, ?)", (server_id, role_id1))
+		cursor.execute("INSERT INTO roles VALUES (?, ?, ?, ?)", (server_id, role_id1, role_id2, role_id3))
 		if language == False:
 			await ctx.send("Роли успешно выбраны!")
 		else:
@@ -124,7 +136,17 @@ async def role_hz(member):
 	else:
 		role_id1 = None
 
-	return role_id1
+	if result:	
+		role_id2 = result[2]
+	else:
+		role_id2 = None
+
+	if result:	
+		role_id3 = result[3]
+	else:
+		role_id3 = None				
+
+	return role_id1, role_id2, role_id3
 
 async def text_return(member):
 	server_id = member.guild.id
@@ -139,19 +161,27 @@ async def text_return(member):
 		title = None
 		text_mess = None		
 
-	return title, text_mess	
+	return title, text_mess
+
+#title = text_return()
+#print(f"{title}")	
 
 @bot.event
 async def on_member_join(member):
 	ping = member.mention
 	guild = member.guild
 	chanel = disnake.utils.get(guild.channels, name="👨👩гражданины")
-	result = await text_return(member)
+	result1 = await text_return(member)
+	result2 = await role_hz(member)
 
-	role_id1 = await role_hz(member)
+	role_id1 = result2[0]
+	role_id2 = result2[1]
+	role_id3 = result2[2]
 	role1 = disnake.utils.get(guild.roles, id=role_id1)
-	title = result[0]
-	text_mess = result[1]
+	role2 = disnake.utils.get(guild.roles, id=role_id2)
+	role3 = disnake.utils.get(guild.roles, id=role_id3)
+	title = result1[0]
+	text_mess = result1[1]
 
 	if title is None or text_mess is None:
 		print("Не выбран текст")
@@ -171,8 +201,8 @@ async def on_member_join(member):
 	
 	embedr.set_thumbnail(url="https://cdn.discordapp.com/attachments/1211575984483078206/1228591262450585631/3.png?ex=662c99c7&is=661a24c7&hm=d4b9580d8a9637fb3e46b6567398d75a57d8eeff14c43e2f51671841c4d10e33&")
 
-	await member.add_roles(role1)
 	await chanel.send(embed=embedr)
+	await member.add_roles(role1, role2, role3)
 
 @has_permissions(ban_members=True)
 @bot.slash_command(
