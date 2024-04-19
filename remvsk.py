@@ -26,13 +26,81 @@ cursor.execute('''CREATE TABLE text_message (
 	title text,
 	text_mess text
 )''')
+
+cursor.execute('''CREATE TABLE chnl (
+	server integer,
+	chnannel integer
+)''')
+
+cursor.execute('''CREATE TABLE automod (
+	server integer,
+	automod boolean
+)''')
 """
 bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intents.all())
+"""
+@bot.event
+async def on_message(message):
+	server_id = message.guild.id
+
+	language = await vibor_yazika_message(message)
+
+	cursor.execute("SELECT * FROM automod WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		automod_status = result[1]
+		time = datetime.datetime.now() + datetime.timedelta(minutes=int("5"))
+		member_id = message.author.id
+"""
 
 @bot.event
 async def on_ready():
 	print(f"{bot.user} готов сжигать евреев.")
 	await bot.change_presence(activity=disnake.Game(name="HOI4"))
+
+@has_permissions(administrator=True)
+@bot.slash_command(
+	name="set_channel_add_on_join",
+	description="закрепляет канал",
+	options=[
+		disnake.Option("channel", "channel", type=disnake.OptionType.channel, required=True)
+	]
+)
+async def chanel_add(ctx, channel: disnake.TextChannel):
+	server_id = ctx.guild.id
+	language = await vibor_yazika(ctx)
+
+	channel_id = channel.id
+
+	cursor.execute("SELECT * FROM chnl WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		cursor.execute("UPDATE chnl SET chnannel = ?  WHERE server = ?", (channel_id, server_id))
+		if language == False:
+			await ctx.send("Канал успешно выбран!")
+		else:
+			await ctx.send("Channel successfully selected!")			
+	else:
+		cursor.execute("INSERT INTO chnl VALUES (?, ?)", (server_id, channel_id))
+		if language == False:
+			await ctx.send("Канал успешно выбран!")
+		else:
+			await ctx.send("Channel successfully selected!")
+
+async def channel_id_func(member):
+	server_id = member.guild.id
+
+	cursor.execute("SELECT * FROM chnl WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		channel_id = result[1]
+	else:
+		channel_id = None
+
+	return channel_id			
 
 @has_permissions(administrator=True)
 @bot.slash_command(
@@ -163,23 +231,21 @@ async def text_return(member):
 
 	return title, text_mess
 
-#title = text_return()
-#print(f"{title}")	
-
 @bot.event
 async def on_member_join(member):
 	ping = member.mention
 	guild = member.guild
-	chanel = disnake.utils.get(guild.channels, name="👨👩гражданины")
 	result1 = await text_return(member)
 	result2 = await role_hz(member)
 
+	chanel_id = await channel_id_func(member)
 	role_id1 = result2[0]
 	role_id2 = result2[1]
 	role_id3 = result2[2]
 	role1 = disnake.utils.get(guild.roles, id=role_id1)
 	role2 = disnake.utils.get(guild.roles, id=role_id2)
 	role3 = disnake.utils.get(guild.roles, id=role_id3)
+	chanel = disnake.utils.get(guild.channels, id=chanel_id)	
 	title = result1[0]
 	text_mess = result1[1]
 
@@ -394,8 +460,48 @@ async def test(ctx):
 	else:
 		await ctx.send("bot language English")
 
+# часть для автомода
+@has_permissions(administrator=True)
+@bot.slash_command(
+	name="automod",
+	description="set automod"
+)
+async def automod(ctx):
+	server_id = ctx.guild.id
+
+	language = await vibor_yazika(ctx)
+
+	cursor.execute("SELECT * FROM automod WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		cursor.execute("UPDATE automod SET automod = NOT automod WHERE server = ?", (server_id,))
+		if language == False:
+			await ctx.send("Статус автомода изменен.")
+		else:
+			await ctx.send("Automod status changed.")
+	else:
+		cursor.execute("INSERT INTO automod VALUES(?, True)", (server_id,))
+		if language == False:
+			await ctx.send("Статус автомода изменен.")	
+		else:
+			await ctx.send("Automod status changed.")		
+
 async def vibor_yazika(ctx):
 	server_id = ctx.guild.id
+
+	cursor.execute("SELECT * FROM local WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		language = result[1]
+	else:
+		language = None
+
+	return language	
+
+async def vibor_yazika_message(message):
+	server_id = message.guild.id
 
 	cursor.execute("SELECT * FROM local WHERE server = ?", (server_id,))
 	result = cursor.fetchone()
