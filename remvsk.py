@@ -2,6 +2,7 @@ import disnake
 import json
 import datetime
 import sqlite3
+import time
 from disnake.ext import commands
 from disnake.ext.commands import has_permissions
 from disnake import Embed
@@ -36,23 +37,75 @@ cursor.execute('''CREATE TABLE automod (
 	server integer,
 	automod boolean
 )''')
+
+cursor.execute('''CREATE TABLE naturali (
+	author_id integer,
+	time_message integer
+)''')
 """
+message_count = {}
+
 bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intents.all())
-"""
+
 @bot.event
 async def on_message(message):
+	#bidlovsk only
+	guild = message.guild
+	role3 = discord.utils.get(guild.roles, name="Анти ІДІ Нахуй (114 робуксов)")
+	author = message.author
+	#bidlovsk only
+	author_id = message.author.id
 	server_id = message.guild.id
+	channel = message.channel
+	message_author_id = message.author.id
+	author = message.author
+	ping = author.mention
+	reason = "spam"
+	time2 = datetime.datetime.now() + datetime.timedelta(minutes=int(5))
+	time1 = time.time()
+
+	cursor.execute("SELECT * FROM naturali WHERE author_id = ?", (author_id,))
+	result = cursor.fetchone()
 
 	language = await vibor_yazika_message(message)
 
-	cursor.execute("SELECT * FROM automod WHERE server = ?", (server_id,))
-	result = cursor.fetchone()
+	automod_status = await automod_check_message(message)
 
-	if result:
-		automod_status = result[1]
-		time = datetime.datetime.now() + datetime.timedelta(minutes=int("5"))
-		member_id = message.author.id
-"""
+	if automod_status == True:
+		if role3 in author.roles: #bidlovsk only
+			return #bidlovsk only
+		message_count.setdefault(message_author_id, 0)
+		message_count[message_author_id] += 1
+
+		if result:
+			time_message = result[1]
+			resultat = time1 - time_message
+			cursor.execute("UPDATE naturali SET time_message = ?  WHERE author_id = ?", (time1, author_id))
+			if resultat > 5.5:
+				message_count[message_author_id] = 0
+				print("нахрюк ебаный")
+				return
+			else:
+				if message_count[message_author_id] >= 5:
+					await author.timeout(reason=reason, until=time2)
+					message_count[message_author_id] = 0
+					if language == False:
+						await channel.send(f"{ping} был замучен за спам на 5 минут.")
+						print(resultat)
+					else:
+						await channel.send(f"{ping} muted for spamming for 5 minutes.")
+						print(resultat)	
+					return
+				else:
+					return	
+		else:
+			time_message = time.time()	
+			cursor.execute("INSERT INTO naturali VALUES (?, ?)", (author_id, time_message))
+			print("на карандашике")			
+	else:
+		return
+
+	await bot.process_commands(message)					
 
 @bot.event
 async def on_ready():
@@ -512,6 +565,19 @@ async def vibor_yazika_message(message):
 		language = None
 
 	return language	
+
+async def automod_check_message(message):
+	server_id = message.guild.id
+
+	cursor.execute("SELECT * FROM automod WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		automod_status = result[1]
+	else:
+		automod_status = None
+
+	return automod_status	
 		
 bot.run("YOU_TOKEN")
 db.commit()
