@@ -3,6 +3,7 @@ import json
 import datetime
 import sqlite3
 import time
+from disnake import audit_logs
 from disnake.ext import commands
 from disnake.ext.commands import has_permissions
 from disnake import Embed
@@ -42,6 +43,13 @@ cursor.execute('''CREATE TABLE naturali (
 	author_id integer,
 	time_message integer
 )''')
+
+cursor.execute('''CREATE TABLE saved_server (
+	saved_name text,
+	save_roles text,
+	save_permissions_roles_in_channel text,
+	save_category_channel text
+)''')
 """
 message_count = {}
 
@@ -51,7 +59,7 @@ bot = commands.Bot(command_prefix="!", help_command=None, intents=disnake.Intent
 async def on_message(message):
 	#bidlovsk only
 	guild = message.guild
-	role3 = discord.utils.get(guild.roles, name="Анти ІДІ Нахуй (114 робуксов)")
+	role3 = disnake.utils.get(guild.roles, name="Анти ІДІ Нахуй (114 робуксов)")
 	author = message.author
 	#bidlovsk only
 	author_id = message.author.id
@@ -105,7 +113,52 @@ async def on_message(message):
 	else:
 		return
 
-	await bot.process_commands(message)					
+	await bot.process_commands(message)	
+
+@bot.event
+async def on_guild_channel_delete(channel):
+	guild = channel.guild
+	channel_name = channel.name
+	channel_position = channel.position
+	channel_category = channel.category
+	server_roles = channel.guild.roles 
+	permissions = {}
+	audit_logs = await guild.audit_logs(limit=1).flatten()
+	logs = audit_logs[0]
+	reason = "Рейд бот"
+
+
+	for role in server_roles:
+		permissions[role] = channel.overwrites_for(role)
+
+	automod_status = await automod_check_channel(channel)
+	
+
+	if automod_status == True:
+		if channel.type == disnake.ChannelType.voice:
+			if logs.user.bot:
+				try:
+					await user.ban(reason=reason)
+					print("Бот был забанен")
+				except disnake.errors.Forbidden:
+					print("Бот не может быть забанен из-за недостатка прав")
+			await channel.guild.create_voice_channel(name=channel_name, position=channel_position, category=channel_category, overwrites=permissions)
+		if channel.type == disnake.ChannelType.text:	
+			if logs.user.bot:
+				try:
+					await user.ban(reason=reason)
+					print("Бот был забанен")
+				except disnake.errors.Forbidden:
+					print("Бот не может быть забанен из-за недостатка прав")
+			await channel.guild.create_text_channel(name=channel_name, position=channel_position, category=channel_category, overwrites=permissions)
+		if channel.type == disnake.ChannelType.category:
+			if logs.user.bot:
+				try:
+					await user.ban(reason=reason)
+					print("Бот был забанен")
+				except disnake.errors.Forbidden:
+					print("Бот не может быть забанен из-за недостатка прав")
+			await channel.guild.create_category(name=channel_name, position=channel_position,overwrites=permissions)			
 
 @bot.event
 async def on_ready():
@@ -538,8 +591,16 @@ async def automod(ctx):
 		if language == False:
 			await ctx.send("Статус автомода изменен.")	
 		else:
-			await ctx.send("Automod status changed.")		
-
+			await ctx.send("Automod status changed.")	
+"""
+@has_permissions(administrator=True)
+@bot.slash_command(
+	name="save",
+	description="save data server"
+	disnake.Option("name","имя сохранения", type=disnake.OptionType.user, required=True)
+)				
+async def save(ctx,)
+"""
 async def vibor_yazika(ctx):
 	server_id = ctx.guild.id
 
@@ -577,7 +638,20 @@ async def automod_check_message(message):
 	else:
 		automod_status = None
 
-	return automod_status	
+	return automod_status
+
+async def automod_check_channel(channel):
+	server_id = channel.guild.id
+
+	cursor.execute("SELECT * FROM automod WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		automod_status = result[1]
+	else:
+		automod_status = None
+
+	return automod_status			
 		
 bot.run("YOU_TOKEN")
 db.commit()
