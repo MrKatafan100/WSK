@@ -46,8 +46,6 @@ cursor.execute('''CREATE TABLE naturali (
 
 cursor.execute('''CREATE TABLE saved_server (
 	saved_name text,
-	save_roles text,
-	save_permissions_roles_in_channel text,
 	save_category_channel text
 )''')
 """
@@ -126,6 +124,7 @@ async def on_guild_channel_delete(channel):
 	audit_logs = await guild.audit_logs(limit=1).flatten()
 	logs = audit_logs[0]
 	reason = "Рейд бот"
+	user = logs.user
 
 
 	for role in server_roles:
@@ -592,15 +591,81 @@ async def automod(ctx):
 			await ctx.send("Статус автомода изменен.")	
 		else:
 			await ctx.send("Automod status changed.")	
-"""
+
 @has_permissions(administrator=True)
 @bot.slash_command(
 	name="save",
-	description="save data server"
-	disnake.Option("name","имя сохранения", type=disnake.OptionType.user, required=True)
+	description="save data server",
+	options=[
+	disnake.Option("name", "имя сохранения", type=disnake.OptionType.string, required=True)
+	]
 )				
-async def save(ctx,)
-"""
+async def save(ctx, name: str):
+	cursor.execute("SELECT * FROM saved_server WHERE saved_name = ?", (name,))
+	result = cursor.fetchone()
+	saved_data = {}
+
+	saved_data[name] = {
+	"categorys": []
+	}
+
+	for category in ctx.guild.categories:
+		categorys = {
+		"name": category.name,
+		"channels": []
+		}
+		for channel in category.channels:
+			channel_type = "voice" if channel.type == disnake.ChannelType.voice else "text"
+			channels_data = {
+			"name": channel.name,
+			"type": channel_type
+			}
+
+			categorys["channels"].append(channels_data)
+		saved_data[name]["categorys"].append(categorys)
+
+	print(saved_data)
+
+	if result:
+		cursor.execute("UPDATE saved_server SET save_category_channel = ?  WHERE saved_name = ?", (json.dumps(saved_data[name]), name))
+	else:
+		cursor.execute("INSERT INTO saved_server VALUES(?, ?)", (name, json.dumps(saved_data[name])))
+
+	await ctx.send("готово")
+
+@has_permissions(administrator=True)
+@bot.slash_command(
+	name="create",
+	description="creat data server",
+	options=[
+	disnake.Option("name", "имя сохранения", type=disnake.OptionType.string, required=True)
+	]
+)		
+async def create(ctx, name: str):
+	language = await vibor_yazika(ctx)
+
+	cursor.execute("SELECT * FROM saved_server WHERE saved_name = ?", (name,))
+	result = cursor.fetchone()
+
+	if language == False:
+		await ctx.send("Создано!")	
+	else:
+		await ctx.send("Created!")		
+
+	if result:
+		saved_data = json.loads(result[1])
+
+		for category_data in saved_data["categorys"]:
+			print(category_data)
+			new_category = await ctx.guild.create_category(name=category_data["name"])
+
+			for channel in category_data["channels"]:
+				if channel["type"] == "text":
+					await new_category.create_text_channel(name=channel["name"])
+				if channel["type"] == "voice":
+					await new_category.create_voice_channel(name=channel["name"])		
+
+
 async def vibor_yazika(ctx):
 	server_id = ctx.guild.id
 
@@ -651,7 +716,7 @@ async def automod_check_channel(channel):
 	else:
 		automod_status = None
 
-	return automod_status			
+	return automod_status				
 		
 bot.run("YOU_TOKEN")
 db.commit()
