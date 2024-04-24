@@ -160,6 +160,30 @@ async def on_guild_channel_delete(channel):
 			await channel.guild.create_category(name=channel_name, position=channel_position,overwrites=permissions)			
 
 @bot.event
+async def on_guild_role_delete(role):
+	guild = role.guild
+	role_name = role.name
+	role_color = role.color
+	role_permissions = role.permissions
+	permissions = {}
+	audit_logs = await guild.audit_logs(limit=1).flatten()
+	logs = audit_logs[0]
+	reason = "Рейд бот"
+	user = logs.user
+
+	automod_status = await automod_check_role(role)
+
+	if automod_status == True:
+		if logs.user.bot:
+			try:
+				await user.ban(reason=reason)
+				print("Бот был забанен")
+			except disnake.errors.Forbidden:
+				print("Бот не может быть забанен из-за недостатка прав")
+		new_role = await role.guild.create_role(name=role_name, color=role_color, permissions=role_permissions)
+
+
+@bot.event
 async def on_ready():
 	print(f"{bot.user} готов сжигать евреев.")
 	await bot.change_presence(activity=disnake.Game(name="HOI4"))
@@ -596,17 +620,16 @@ async def automod(ctx):
 @bot.slash_command(
 	name="save",
 	description="save data server",
-	options=[
-	disnake.Option("name", "имя сохранения", type=disnake.OptionType.string, required=True)
-	]
 )				
-async def save(ctx, name: str):
+async def save(ctx):
+	name = ctx.author.id
 	cursor.execute("SELECT * FROM saved_server WHERE saved_name = ?", (name,))
 	result = cursor.fetchone()
 	saved_data = {}
 
 	saved_data[name] = {
-	"categorys": []
+	"categorys": [],
+	"roles": []
 	}
 
 	for category in ctx.guild.categories:
@@ -624,6 +647,18 @@ async def save(ctx, name: str):
 			categorys["channels"].append(channels_data)
 		saved_data[name]["categorys"].append(categorys)
 
+	for roles in ctx.guild.roles:
+		if roles.id == ctx.guild.default_role.id:
+			continue
+		if roles.is_bot_managed():
+			print("роль бота")
+			continue	
+		roles_list = {
+		"name": roles.name,
+		"color": roles.color.value,
+		"permissions": roles.permissions.value
+		}
+		saved_data[name]["roles"].append(roles_list)
 	print(saved_data)
 
 	if result:
@@ -637,11 +672,9 @@ async def save(ctx, name: str):
 @bot.slash_command(
 	name="create",
 	description="creat data server",
-	options=[
-	disnake.Option("name", "имя сохранения", type=disnake.OptionType.string, required=True)
-	]
 )		
-async def create(ctx, name: str):
+async def create(ctx):
+	name = ctx.author.id
 	language = await vibor_yazika(ctx)
 
 	cursor.execute("SELECT * FROM saved_server WHERE saved_name = ?", (name,))
@@ -663,8 +696,11 @@ async def create(ctx, name: str):
 				if channel["type"] == "text":
 					await new_category.create_text_channel(name=channel["name"])
 				if channel["type"] == "voice":
-					await new_category.create_voice_channel(name=channel["name"])		
+					await new_category.create_voice_channel(name=channel["name"])
 
+		for roles_data in saved_data["roles"]	:
+			permissions = disnake.Permissions(roles_data["permissions"])
+			await ctx.guild.create_role(name=roles_data["name"], color=roles_data["color"], permissions=permissions)
 
 async def vibor_yazika(ctx):
 	server_id = ctx.guild.id
@@ -716,7 +752,20 @@ async def automod_check_channel(channel):
 	else:
 		automod_status = None
 
-	return automod_status				
+	return automod_status
+
+async def automod_check_role(role):
+	server_id = role.guild.id
+
+	cursor.execute("SELECT * FROM automod WHERE server = ?", (server_id,))
+	result = cursor.fetchone()
+
+	if result:
+		automod_status = result[1]
+	else:
+		automod_status = None
+
+	return automod_status			
 		
 bot.run("YOU_TOKEN")
 db.commit()
