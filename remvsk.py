@@ -849,16 +849,14 @@ async def channel_ad(ctx, channel):
 
     if result:
         cursor.execute("UPDATE _url_ SET channel_id = ?  WHERE server = ?", (channel_id, server_id))
-        if language == False:
-            await ctx.send("Канал успешно выбран!")
-        else:
-            await ctx.send("Channel successfully selected!")
     else:
         cursor.execute("INSERT INTO _url_ VALUES (?, ?)", (server_id, channel_id))
-        if language == False:
-            await ctx.send("Канал успешно выбран!")
-        else:
-            await ctx.send("Channel successfully selected!")
+    if language == False:
+        embed = await embed_create_func(name="Канал успешно выбран!", color=000000)
+        await ctx.send(embed=embed)
+    else:
+        embed = await embed_create_func(name="Channel successfully selected!", color=000000)
+        await ctx.send(embed=embed)
 
 
 @has_permissions(administrator=True)
@@ -880,16 +878,14 @@ async def chanel_add(ctx, channel: disnake.TextChannel):
 
     if result:
         cursor.execute("UPDATE chnl SET chnannel = ?  WHERE server = ?", (channel_id, server_id))
-        if language == False:
-            await ctx.send("Канал успешно выбран!")
-        else:
-            await ctx.send("Channel successfully selected!")
     else:
         cursor.execute("INSERT INTO chnl VALUES (?, ?)", (server_id, channel_id))
-        if language == False:
-            await ctx.send("Канал успешно выбран!")
-        else:
-            await ctx.send("Channel successfully selected!")
+    if language == False:
+        embed = await embed_create_func(name="Канал успешно выбран!", color=000000)
+        await ctx.send(embed=embed)
+    else:
+        embed = await embed_create_func(name="Channel successfully selected!", color=000000)
+        await ctx.send(embed=embed)
 
 
 async def channel_id_func(member):
@@ -939,16 +935,14 @@ async def get_roles(ctx, role1: disnake.Role, role2: disnake.Role = None, role3:
     if result:
         cursor.execute("UPDATE roles SET role1 = ?, role2 = ?, role3 = ?  WHERE server = ?",
                        (role_id1, role_id2, role_id3, server_id))
-        if language == False:
-            await ctx.send("Роли успешно выбраны!")
-        else:
-            await ctx.send("Roles have been successfully selected!")
     else:
         cursor.execute("INSERT INTO roles VALUES (?, ?, ?, ?)", (server_id, role_id1, role_id2, role_id3))
-        if language == False:
-            await ctx.send("Роли успешно выбраны!")
-        else:
-            await ctx.send("Roles have been successfully selected!")
+    if language == False:
+        embed = await embed_create_func(name="Роли успешно выбраны!", color=000000)
+        await ctx.send(embed=embed)
+    else:
+        embed = await embed_create_func(name="Roles have been successfully selected!", color=000000)
+        await ctx.send(embed=embed)
 
 
 @has_permissions(administrator=True)
@@ -972,9 +966,11 @@ async def img(ctx, url: str):
         cursor.execute("INSERT INTO img VALUES (?, ?)", (server_id, url))
 
     if language == False:
-        await ctx.send("Картинка установлена.")
+        embed = await embed_create_func(name="Картинка установлена.", color=000000)
+        await ctx.send(embed=embed)
     else:
-        await ctx.send("The picture is set.")
+        embed = await embed_create_func(name="The picture is set.", color=000000)
+        await ctx.send(embed=embed)
 
 
 async def check_img(member):
@@ -1049,20 +1045,18 @@ async def get_message(ctx, title: str = "", text: str = "", mention = False):
     cursor.execute("SELECT * FROM text_message WHERE server = ?", (server_id,))
     result = cursor.fetchone()
 
-    if language == False:
-        if result:
-            cursor.execute("UPDATE text_message SET title = ?, text_mess = ?, ping_boolean = ? WHERE server = ?", (title, text, mention, server_id))
-            await ctx.send("Текст добавлен.")
-        else:
-            cursor.execute("INSERT INTO text_message VALUES (?, ?, ?, ?)", (server_id, title, text, mention))   
-            await ctx.send("Текст добавлен.")
+    if result:
+        cursor.execute("UPDATE text_message SET title = ?, text_mess = ?, ping_boolean = ? WHERE server = ?", (title, text, mention, server_id))
     else:
-        if result:
-            cursor.execute("UPDATE text_message SET title = ?, text_mess = ?, ping_boolean = ? WHERE server = ?", (title, text, mention, server_id))
-            await ctx.send("Text added.")
-        else:
-            cursor.execute("INSERT INTO text_message VALUES (?, ?, ?, ?)", (server_id, title, text, mention))   
-            await ctx.send("Text added.")
+        cursor.execute("INSERT INTO text_message VALUES (?, ?, ?, ?)", (server_id, title, text, mention))   
+
+    if language == False:
+        embed = await embed_create_func(name="Текст добавлен.", color=000000)
+        await ctx.send(embed=embed)
+    else:
+        embed = await embed_create_func(name="Text added.", color=000000)
+        await ctx.send(embed=embed)
+
 
 @bot.event
 async def vibor_yazika_member(member):
@@ -1236,19 +1230,23 @@ async def ban(ctx, user: disnake.Member, reason: str):
     else:
         language = True
 
-    if language == False:
-        if ctx.author.top_role.position > user.top_role.position:
-            await user.ban(reason=reason)
-            await ctx.send(f"{ping} был забанен по причине {reason}.")
-        else:
-            await ctx.send("Ты хотел забанить админа? ІДІ нахуй.")
-
+    if ctx.author.top_role.position > user.top_role.position:
+        await user.ban(reason=reason)
     else:
-        if ctx.author.top_role.position > user.top_role.position:
-            await user.ban(reason=reason)
-            await ctx.send(f"{ping} was banned for {reason}.")
+        if language == True:
+            embed = await embed_create_func(name="Ты хотел забанить админа? ІДІ нахуй.", color=000000)
+            await ctx.send(embed=embed) 
         else:
-            await ctx.send("Did you want to ban an admin?.")
+            embed = await embed_create_func(name="Did you want to ban an admin?.", color=000000)
+            await ctx.send(embed=embed)
+        return
+
+    if language == False:
+        embed = await embed_create_func(name="Отчет об бане", description=f"{ping} был забанен по причине {reason}.", color=000000)
+        await ctx.send(embed=embed)
+    else:
+        embed = await embed_create_func(name="Ban report", description=f"{ping} was banned for {reason}.", color=000000)
+        await ctx.send(embed=embed)
 
 
 @has_permissions(kick_members=True)
